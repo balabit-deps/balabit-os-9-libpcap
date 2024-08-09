@@ -1,0 +1,102 @@
+From: Guy Harris <gharris@sonic.net>
+Date: Sat Apr 9 16:55:20 2022 -0700
+Subject: linux: set handlep->vlan_offset if the linktype is changed.
+
+linux: set handlep->vlan_offset if the linktype is changed.
+
+The change to the linktype might change the offset at which to insert
+VLAN tags (or change it to -1, meaning "don't insert VLAN tags").
+
+This should fix issue #1105.
+
+Bug-Ubuntu: https://launchpad.net/bugs/2076398
+Origin: upstream, https://github.com/the-tcpdump-group/libpcap/commit/4bfca3682e5aeabe05b4406daf00c9abcc36c571
+
+--- libpcap-1.10.1.orig/pcap-linux.c
++++ libpcap-1.10.1/pcap-linux.c
+@@ -948,6 +948,39 @@ static void pcap_breakloop_linux(pcap_t
+ }
+ 
+ /*
++ * Set the offset at which to insert VLAN tags.
++ * That should be the offset of the type field.
++ */
++static void
++set_vlan_offset(pcap_t *handle)
++{
++	struct pcap_linux *handlep = handle->priv;
++
++	switch (handle->linktype) {
++
++	case DLT_EN10MB:
++		/*
++		 * The type field is after the destination and source
++		 * MAC address.
++		 */
++		handlep->vlan_offset = 2 * ETH_ALEN;
++		break;
++
++	case DLT_LINUX_SLL:
++		/*
++		 * The type field is in the last 2 bytes of the
++		 * DLT_LINUX_SLL header.
++		 */
++		handlep->vlan_offset = SLL_HDR_LEN - 2;
++		break;
++
++	default:
++		handlep->vlan_offset = -1; /* unknown */
++		break;
++	}
++}
++
++/*
+  *  Get a handle for a live capture from the given device. You can
+  *  pass NULL as device to get all packages (without link level
+  *  information of course). If you pass 1 as promisc the interface
+@@ -1111,6 +1144,13 @@ static int
+ pcap_set_datalink_linux(pcap_t *handle, int dlt)
+ {
+ 	handle->linktype = dlt;
++
++	/*
++	 * Update the offset at which to insert VLAN tags for the
++	 * new link-layer type.
++	 */
++	set_vlan_offset(handle);
++
+ 	return 0;
+ }
+ 
+@@ -2584,30 +2624,8 @@ activate_pf_packet(pcap_t *handle, int i
+ 
+ 	/*
+ 	 * Set the offset at which to insert VLAN tags.
+-	 * That should be the offset of the type field.
+ 	 */
+-	switch (handle->linktype) {
+-
+-	case DLT_EN10MB:
+-		/*
+-		 * The type field is after the destination and source
+-		 * MAC address.
+-		 */
+-		handlep->vlan_offset = 2 * ETH_ALEN;
+-		break;
+-
+-	case DLT_LINUX_SLL:
+-		/*
+-		 * The type field is in the last 2 bytes of the
+-		 * DLT_LINUX_SLL header.
+-		 */
+-		handlep->vlan_offset = SLL_HDR_LEN - 2;
+-		break;
+-
+-	default:
+-		handlep->vlan_offset = -1; /* unknown */
+-		break;
+-	}
++	set_vlan_offset(handle);
+ 
+ 	if (handle->opt.tstamp_precision == PCAP_TSTAMP_PRECISION_NANO) {
+ 		int nsec_tstamps = 1;

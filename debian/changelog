@@ -1,3 +1,11 @@
+libpcap (1.10.1-4ubuntu1.22.04.1) jammy; urgency=medium
+
+  * Tcpdump utility captures incorrect packets on VLAN interface when using
+    SLL2 (LP: #2076398)
+    - d/p/lp2076398-linux-set-handlep-vlan_offset-if-the-linktype-is-cha.patch
+
+ -- Chengen Du <chengen.du@canonical.com>  Fri, 09 Aug 2024 08:13:59 +0000
+
 libpcap (1.10.1-4build1) jammy; urgency=high
 
   * No change rebuild for ppc64el baseline bump.
